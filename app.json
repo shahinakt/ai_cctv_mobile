@@ -31,12 +31,12 @@
       "expo-build-properties"
     ],
     "extra": {
-      "API_URL": "http://192.168.1.50:8000",
+      "API_URL": "http://192.168.137.1:8000",
       "eas": {
-        "projectId": "7126f96b-d446-4346-bad9-9bcd8aecc73e"
+        "projectId": "28411f73-0643-4a2a-bcf0-c4dd256ee4fc"
       }
     },
-    "owner": "shahinasareen",
+    "owner": "shahina6269",
     "scheme": "aicctv"
   }
 }
