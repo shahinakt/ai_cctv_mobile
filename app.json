@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "AISurveil",
+    "slug": "ai-cctv-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "icon": "./assets/icon.png",
+    "assetBundlePatterns": ["**/*"],
+
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.aicctvmobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera to view CCTV feeds.",
+        "NSMicrophoneUsageDescription": "This app uses the microphone for video recording."
+      }
+    },
+
+    "android": {
+      "package": "com.aisurveil.cctv",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#ffffff"
+      }
+    },
+
+    "plugins": ["expo-notifications"],
+
+    "extra": {
+      "eas": {
+        "projectId": "7126f96b-d446-4346-bad9-9bcd8aecc73e"
+      }
+    },
+
+    "owner": "shahinasareen",
+    "scheme": "aicctv"
+  }
+}
