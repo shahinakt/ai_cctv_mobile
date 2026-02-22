@@ -6,9 +6,7 @@
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "icon": "./assets/icon.png",
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.yourcompany.aicctvmobile",
@@ -19,20 +17,21 @@
     },
     "android": {
       "package": "com.aisurveil.cctv",
-      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#ffffff"
-      },
-      "networkSecurityConfig": "./network_security_config.xml"
+      }
     },
     "plugins": [
       "expo-notifications",
-      "expo-build-properties"{
-      "android": {
-        "usesCleartextTraffic": true
-      }
-    }
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
     ],
     "extra": {
       "API_URL": "http://192.168.137.1:8000",
