@@ -28,7 +28,11 @@
     },
     "plugins": [
       "expo-notifications",
-      "expo-build-properties"
+      "expo-build-properties"{
+      "android": {
+        "usesCleartextTraffic": true
+      }
+    }
     ],
     "extra": {
       "API_URL": "http://192.168.137.1:8000",
