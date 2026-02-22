@@ -19,10 +19,12 @@
 
     "android": {
       "package": "com.aisurveil.cctv",
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "networkSecurityConfig": "./network_security_config.xml"
     },
 
     "plugins": ["expo-notifications"],
