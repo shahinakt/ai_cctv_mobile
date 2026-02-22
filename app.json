@@ -30,6 +30,7 @@
     "plugins": ["expo-notifications"],
 
     "extra": {
+      "API_URL": "http://192.168.1.50:8000",
       "eas": {
         "projectId": "7126f96b-d446-4346-bad9-9bcd8aecc73e"
       }
