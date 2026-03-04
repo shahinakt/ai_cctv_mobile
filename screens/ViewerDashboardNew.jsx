@@ -1488,11 +1488,14 @@ const ViewerDashboardNew = ({ navigation }) => {
               alignItems: 'center'
             }}
             onPress={() => {
-              setEditName(userProfile?.username || '');
+              setEditName(userProfile?.full_name || userProfile?.username || '');
               setEditEmail(userProfile?.email || '');
               setEditUserPhone(userProfile?.phone || '');
-              setEditPhone(userProfile?.emergency_contact_1 || '+1 (555) 123-4567');
-              setEditPhone2(userProfile?.emergency_contact_2 || '+1 (555) 987-6543');
+              setEditPhone(userProfile?.emergency_contact_1 || '');
+              setEditPhone2(userProfile?.emergency_contact_2 || '');
+              setEditUserPhoneError('');
+              setEditPhone1Error('');
+              setEditPhone2Error('');
               setEditProfileModal(true);
             }}
           >
@@ -2113,14 +2116,21 @@ const ViewerDashboardNew = ({ navigation }) => {
                   if (hasProfileError) return;
                   try {
                     const payload = {
-                      username: editName.trim(),
+                      ...(editName.trim() ? { full_name: editName.trim() } : {}),
                       ...(editUserPhone ? { phone: editUserPhone } : {}),
-                      ...(editPhone ? { emergency_contact_1: editPhone } : {}),
-                      ...(editPhone2 ? { emergency_contact_2: editPhone2 } : {}),
+                      ...(editPhone ? { emergency_contact_1: editPhone } : { emergency_contact_1: null }),
+                      ...(editPhone2 ? { emergency_contact_2: editPhone2 } : { emergency_contact_2: null }),
                     };
                     const res = await updateUser(userProfile.id, payload);
                     if (res.success) {
-                      const updatedProfile = { ...userProfile, ...res.data, username: editName.trim() };
+                      const updatedProfile = {
+                        ...userProfile,
+                        ...res.data,
+                        full_name: editName.trim() || userProfile.full_name,
+                        phone: editUserPhone || userProfile.phone,
+                        emergency_contact_1: editPhone || null,
+                        emergency_contact_2: editPhone2 || null,
+                      };
                       setUserProfile(updatedProfile);
                       await AsyncStorage.setItem('user', JSON.stringify(updatedProfile));
                       setEditUserPhoneError('');

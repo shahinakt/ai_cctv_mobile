@@ -38,6 +38,17 @@
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.CAMERA",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.INTERNET",
+        "android.permission.VIBRATE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.SYSTEM_ALERT_WINDOW"
       ]
     },
@@ -67,6 +78,9 @@
         "projectId": "28411f73-0643-4a2a-bcf0-c4dd256ee4fc"
       }
     },
-    "owner": "shahina6269"
+    "owner": "shahina6269",
+    "updates": {
+      "url": "https://u.expo.dev/28411f73-0643-4a2a-bcf0-c4dd256ee4fc"
+    }
   }
 }

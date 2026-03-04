@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl, Alert, ScrollView, BackHandler, Modal, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getIncidents, acknowledgeIncident, listSosAlerts, getMe, updateUser } from '../services/api';
+import { getIncidents, acknowledgeIncident, listSosAlerts, handleSosAlert, getMe, updateUser } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Helper function to map incident type to display name
@@ -27,6 +27,11 @@ const SecurityDashboardNew = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState({});
   const acknowledgedIncidentsRef = useRef(new Set());
+
+  // SOS Mark Handled modal state
+  const [sosActionModal, setSosActionModal] = useState({ visible: false, sosId: null });
+  const [sosResolveNote, setSosResolveNote] = useState('');
+  const [sosHandling, setSosHandling] = useState(false);
 
   // Profile state
   const [userProfile, setUserProfile] = useState(null);
@@ -143,6 +148,28 @@ const SecurityDashboardNew = ({ navigation }) => {
       Alert.alert('Error', 'Failed to handle incident');
     } finally {
       setActionLoading(prev => ({ ...prev, [incidentId]: false }));
+    }
+  };
+
+  const handleMarkSosHandled = async () => {
+    const { sosId } = sosActionModal;
+    if (!sosId) return;
+    setSosHandling(true);
+    const res = await handleSosAlert(sosId, sosResolveNote.trim());
+    setSosHandling(false);
+    setSosActionModal({ visible: false, sosId: null });
+    setSosResolveNote('');
+    if (res.success) {
+      setSOSAlerts(prev =>
+        prev.map(a =>
+          a.id === sosId
+            ? { ...a, alert_status: 'handled', handled_at: new Date().toISOString() }
+            : a,
+        ),
+      );
+      Alert.alert('✅ Resolved', 'SOS alert has been marked as handled.');
+    } else {
+      Alert.alert('Error', res.message || 'Failed to handle SOS alert');
     }
   };
 
@@ -432,19 +459,29 @@ const SecurityDashboardNew = ({ navigation }) => {
           ) : null}
         </View>
 
-        {/* View Incident button – security can view but not mark handled */}
-        <TouchableOpacity
-          style={{
-            backgroundColor: '#F3F4F6',
-            borderRadius: 10,
-            paddingVertical: 10,
-            alignItems: 'center',
-          }}
-          onPress={() => navigation.navigate('IncidentDetail', { incident: { id: alert.incident_id } })}
-          activeOpacity={0.7}
-        >
-          <Text style={{ color: '#4F46E5', fontWeight: '600', fontSize: 13 }}>View Incident</Text>
-        </TouchableOpacity>
+        {/* Action buttons */}
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <TouchableOpacity
+            style={{ flex: 1, backgroundColor: '#F3F4F6', borderRadius: 10, paddingVertical: 10, alignItems: 'center' }}
+            onPress={() => navigation.navigate('IncidentDetail', { incident: { id: alert.incident_id } })}
+            activeOpacity={0.7}
+          >
+            <Text style={{ color: '#4F46E5', fontWeight: '600', fontSize: 13 }}>View Incident</Text>
+          </TouchableOpacity>
+
+          {isActive && (
+            <TouchableOpacity
+              style={{ flex: 1, backgroundColor: '#DC2626', borderRadius: 10, paddingVertical: 10, alignItems: 'center' }}
+              onPress={() => {
+                setSosResolveNote('');
+                setSosActionModal({ visible: true, sosId: alert.id });
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>Mark Handled</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     );
   };
@@ -612,6 +649,58 @@ const SecurityDashboardNew = ({ navigation }) => {
       {currentTab === 'sos' && renderSOSAlertsTab()}
       {currentTab === 'assigned' && renderAssignedTab()}
       {currentTab === 'profile' && renderProfileTab()}
+
+      {/* SOS Mark Handled Confirmation Modal */}
+      <Modal
+        visible={sosActionModal.visible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSosActionModal({ visible: false, sosId: null })}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 24, width: '90%', maxWidth: 400 }}>
+            <Text style={{ fontSize: 18, fontWeight: '800', color: '#1F2937', marginBottom: 6 }}>
+              🚨 Resolve SOS Alert #{sosActionModal.sosId}
+            </Text>
+            <Text style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>
+              Add a resolution note (optional):
+            </Text>
+            <TextInput
+              value={sosResolveNote}
+              onChangeText={setSosResolveNote}
+              placeholder="e.g. False alarm, situation resolved..."
+              placeholderTextColor="#9CA3AF"
+              multiline
+              numberOfLines={3}
+              style={{
+                borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 10,
+                padding: 12, fontSize: 14, color: '#1F2937',
+                backgroundColor: '#F9FAFB', minHeight: 70,
+                textAlignVertical: 'top', marginBottom: 20,
+              }}
+            />
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity
+                onPress={() => setSosActionModal({ visible: false, sosId: null })}
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#D1D5DB', alignItems: 'center' }}
+                disabled={sosHandling}
+              >
+                <Text style={{ color: '#6B7280', fontWeight: '600' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleMarkSosHandled}
+                disabled={sosHandling}
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: sosHandling ? '#E5E7EB' : '#DC2626', alignItems: 'center' }}
+              >
+                {sosHandling
+                  ? <ActivityIndicator size="small" color="#DC2626" />
+                  : <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>Mark Handled</Text>
+                }
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Edit Profile Modal */}
       <Modal

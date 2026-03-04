@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Video } from 'expo-av';
 import { WebView } from 'react-native-webview';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { verifyEvidence, getDebugInfo, getIncidents, getBlockchainStatus, acknowledgeIncident, getSosStatus } from '../services/api';
+import { verifyEvidence, getDebugInfo, getIncidents, getBlockchainStatus, adminVerifyBlockchain, acknowledgeIncident, getSosStatus } from '../services/api';
 
 const SOS_TIMEOUT = 60; // seconds — must match backend SOS_TIMEOUT_SECONDS
 
@@ -14,17 +14,20 @@ const isHighPriority = (severity) =>
 
 const IncidentDetailScreen = ({ route, navigation }) => {
   const tailwind = useTailwind();
-  const { incident: initialIncident } = route.params || {};
+  const { incident: initialIncident, userRole: routeUserRole } = route.params || {};
   const [incident, setIncident] = useState(initialIncident || {});
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [activeEvidence, setActiveEvidence] = useState(null);
-  const [userRole, setUserRole] = useState(null);
+  // Seed role immediately from navigation param so it's available on first render.
+  // AsyncStorage fallback handles cases where the param isn't provided.
+  const [userRole, setUserRole] = useState(routeUserRole || null);
   const [verificationResults, setVerificationResults] = useState({});
   const [baseUrl, setBaseUrl] = useState('');
   const [blockchainRecord, setBlockchainRecord] = useState(null);
   const [blockchainLoading, setBlockchainLoading] = useState(false);
+  const [bcVerifying, setBcVerifying] = useState(false);
 
   // SOS state
   const [sosStatus, setSosStatus] = useState(null);
@@ -42,15 +45,42 @@ const IncidentDetailScreen = ({ route, navigation }) => {
     }
   }, []);
   
-  // Load user role and base URL on mount
+  // Load user role and base URL on mount.
+  // If routeUserRole was already provided by the navigation caller we skip the
+  // AsyncStorage read (role is already in state), but we still need it if the
+  // screen is opened from a context that doesn't pass the role param.
   React.useEffect(() => {
     const loadUserRole = async () => {
       try {
+        // 1. If the calling screen passed the role param, trust it.
+        if (routeUserRole) {
+          console.log('[IncidentDetail] Role from route param:', routeUserRole);
+          setUserRole(routeUserRole);
+          return;
+        }
+        // 2. Try the 'user' object stored on login.
         const raw = await AsyncStorage.getItem('user');
         if (raw) {
           const parsed = JSON.parse(raw);
-          setUserRole(parsed.role || null);
+          if (parsed.role) {
+            console.log('[IncidentDetail] Role from AsyncStorage user object:', parsed.role);
+            setUserRole(parsed.role);
+            return;
+          }
         }
+        // 3. Presence of adminToken ⟹ admin session.
+        const adminToken = await AsyncStorage.getItem('adminToken');
+        if (adminToken) {
+          console.log('[IncidentDetail] Role inferred from adminToken presence: admin');
+          setUserRole('admin');
+          return;
+        }
+        const securityToken = await AsyncStorage.getItem('securityToken');
+        if (securityToken) {
+          setUserRole('security');
+          return;
+        }
+        setUserRole('viewer');
       } catch (err) {
         console.error('Failed to load user role:', err);
       }
@@ -480,35 +510,7 @@ const IncidentDetailScreen = ({ route, navigation }) => {
               </View>
             )}
 
-            {/* Message for evidence without blockchain - Admin Only */}
-            {userRole === 'admin' && !item.blockchain_tx_hash && (
-              <View style={{ 
-                marginTop: 12, 
-                paddingTop: 12, 
-                borderTopWidth: 1, 
-                borderTopColor: '#E5E7EB' 
-              }}>
-                <View style={{ 
-                  padding: 10, 
-                  borderRadius: 6,
-                  backgroundColor: '#FEF3C7',
-                  borderWidth: 1,
-                  borderColor: '#F59E0B'
-                }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Ionicons name="information-circle" size={18} color="#D97706" />
-                    <Text style={{ 
-                      fontSize: 12, 
-                      color: '#92400E',
-                      marginLeft: 6,
-                      flex: 1
-                    }}>
-                      Evidence not registered on blockchain
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            )}
+
           </View>
         </View>
       );
@@ -897,17 +899,20 @@ const IncidentDetailScreen = ({ route, navigation }) => {
 
         {/* ─── Blockchain Evidence Integrity Panel ─── */}
         <View style={{
-          backgroundColor: '#0F172A',
+          backgroundColor: '#FFFFFF',
           borderRadius: 12,
           padding: 20,
           marginBottom: 20,
-          borderWidth: 1,
-          borderColor: '#1E293B',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.06,
+          shadowRadius: 8,
+          elevation: 3,
         }}>
           {/* Header */}
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
             <Ionicons name="shield-checkmark-outline" size={22} color="#6366F1" />
-            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#E2E8F0', marginLeft: 8 }}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1F2937', marginLeft: 8 }}>
               Blockchain Evidence Integrity
             </Text>
           </View>
@@ -922,7 +927,7 @@ const IncidentDetailScreen = ({ route, navigation }) => {
             return (
               <View>
                 {/* Status Row */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                   <Text style={{ fontSize: 18, marginRight: 8 }}>{emoji}</Text>
                   <Ionicons name={icon} size={20} color={color} style={{ marginRight: 6 }} />
                   <Text style={{ color, fontWeight: '700', fontSize: 15 }}>
@@ -931,27 +936,27 @@ const IncidentDetailScreen = ({ route, navigation }) => {
                 </View>
 
                 {/* Details */}
-                <View style={{ backgroundColor: '#1E293B', borderRadius: 10, padding: 12 }}>
+                <View style={{ backgroundColor: '#F9FAFB', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#F3F4F6' }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <Text style={{ color: '#94A3B8', fontSize: 12 }}>Incident ID</Text>
-                    <Text style={{ color: '#E2E8F0', fontSize: 12, fontWeight: '600' }}>#{blockchainRecord.incident_id}</Text>
+                    <Text style={{ color: '#6B7280', fontSize: 12 }}>Incident ID</Text>
+                    <Text style={{ color: '#1F2937', fontSize: 12, fontWeight: '600' }}>#{blockchainRecord.incident_id}</Text>
                   </View>
                   {blockchainRecord.verified_by_admin && (
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <Text style={{ color: '#94A3B8', fontSize: 12 }}>Blockchain Status</Text>
-                      <Text style={{ color: '#E2E8F0', fontSize: 12, fontWeight: '600' }}>Verified by Admin</Text>
+                      <Text style={{ color: '#6B7280', fontSize: 12 }}>Blockchain Status</Text>
+                      <Text style={{ color: '#10B981', fontSize: 12, fontWeight: '600' }}>Verified by Admin</Text>
                     </View>
                   )}
                   {blockchainRecord.verification_date && (
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <Text style={{ color: '#94A3B8', fontSize: 12 }}>Verified On</Text>
-                      <Text style={{ color: '#E2E8F0', fontSize: 12 }}>
+                      <Text style={{ color: '#6B7280', fontSize: 12 }}>Verified On</Text>
+                      <Text style={{ color: '#1F2937', fontSize: 12 }}>
                         {new Date(blockchainRecord.verification_date).toLocaleDateString()}
                       </Text>
                     </View>
                   )}
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ color: '#94A3B8', fontSize: 12 }}>Evidence Hash</Text>
+                    <Text style={{ color: '#6B7280', fontSize: 12 }}>Evidence Hash</Text>
                     <Text style={{ color: '#6366F1', fontSize: 11, fontFamily: 'monospace' }}>
                       {blockchainRecord.evidence_hash
                         ? `${blockchainRecord.evidence_hash.slice(0, 10)}…${blockchainRecord.evidence_hash.slice(-6)}`
@@ -960,34 +965,73 @@ const IncidentDetailScreen = ({ route, navigation }) => {
                   </View>
                 </View>
 
-                {/* View Full Details Button */}
-                <TouchableOpacity
-                  onPress={() => navigation.navigate('BlockchainVerification', { incident })}
-                  style={{
-                    marginTop: 14,
-                    backgroundColor: '#1E293B',
-                    borderRadius: 10,
-                    paddingVertical: 12,
-                    flexDirection: 'row',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    borderWidth: 1,
-                    borderColor: '#334155',
-                  }}
-                >
-                  <Ionicons name="open-outline" size={16} color="#6366F1" style={{ marginRight: 8 }} />
-                  <Text style={{ color: '#6366F1', fontWeight: '700', fontSize: 14 }}>
-                    View Blockchain Details
-                  </Text>
-                </TouchableOpacity>
+                {/* Action Buttons Row */}
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+                  {/* Verify Evidence — admin only, pending only */}
+                  {userRole === 'admin' && s === 'Pending' && (
+                    <TouchableOpacity
+                      onPress={async () => {
+                        setBcVerifying(true);
+                        const res = await adminVerifyBlockchain(blockchainRecord.incident_id);
+                        setBcVerifying(false);
+                        if (res.success) {
+                          setBlockchainRecord(prev => ({ ...prev, verification_status: res.data?.status || 'Verified', verified_by_admin: true, verification_date: new Date().toISOString() }));
+                          Alert.alert('✅ Verified', 'Evidence integrity confirmed on blockchain.');
+                        } else {
+                          Alert.alert('Error', res.message || 'Verification failed.');
+                        }
+                      }}
+                      disabled={bcVerifying}
+                      style={{
+                        flex: 1,
+                        backgroundColor: bcVerifying ? '#C7D2FE' : '#6366F1',
+                        borderRadius: 10,
+                        paddingVertical: 12,
+                        flexDirection: 'row',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      {bcVerifying ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <>
+                          <Ionicons name="checkmark-shield-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
+                          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Verify Evidence</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  )}
+
+                  {/* View Blockchain Details */}
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('BlockchainVerification', { incident })}
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#F9FAFB',
+                      borderRadius: 10,
+                      paddingVertical: 12,
+                      flexDirection: 'row',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      borderWidth: 1,
+                      borderColor: '#E5E7EB',
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="open-outline" size={16} color="#6366F1" style={{ marginRight: 6 }} />
+                    <Text style={{ color: '#6366F1', fontWeight: '700', fontSize: 14 }}>View Details</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             );
           })() : (
-            <View style={{ alignItems: 'center', paddingVertical: 12 }}>
-              <Ionicons name="cloud-offline-outline" size={32} color="#334155" />
-              <Text style={{ color: '#64748B', fontSize: 13, marginTop: 8, textAlign: 'center' }}>
+            <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+              <Ionicons name="cloud-offline-outline" size={36} color="#D1D5DB" />
+              <Text style={{ color: '#9CA3AF', fontSize: 13, marginTop: 8, textAlign: 'center' }}>
                 No blockchain record yet.{' '}
-                {userRole === 'admin' ? 'View full details once evidence is generated.' : ''}
+                {userRole === 'admin' ? 'Records appear once evidence is generated.' : ''}
               </Text>
               <TouchableOpacity
                 onPress={() => navigation.navigate('BlockchainVerification', { incident })}
