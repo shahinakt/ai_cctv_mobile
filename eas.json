@@ -7,18 +7,21 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "prebuildCommand": "npx expo prebuild --clean",
       "env": {
         "EXPO_PUBLIC_API_URL": "http://192.168.137.1:8000"
       }
     },
     "preview": {
       "distribution": "internal",
+      "prebuildCommand": "npx expo prebuild --clean",
       "env": {
         "EXPO_PUBLIC_API_URL": "http://192.168.137.1:8000"
       }
     },
     "production": {
       "autoIncrement": true,
+      "prebuildCommand": "npx expo prebuild --clean",
       "env": {
         "EXPO_PUBLIC_API_URL": "http://192.168.137.1:8000"
       }
