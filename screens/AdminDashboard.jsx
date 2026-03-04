@@ -280,7 +280,23 @@ const AdminDashboardScreen = ({ navigation }) => {
         <Text style={tailwind('text-sm text-gray-400')}>
           Manage incidents & security
         </Text>
-        {/* Evidence Diagnostics Button Removed */}
+        {/* SOS Alerts Button */}
+        <TouchableOpacity
+          style={{
+            marginTop: 14,
+            backgroundColor: '#DC2626',
+            borderRadius: 10,
+            paddingVertical: 10,
+            paddingHorizontal: 24,
+            flexDirection: 'row',
+            alignItems: 'center',
+          }}
+          onPress={() => navigation.navigate('SOSAlerts')}
+          activeOpacity={0.8}
+        >
+          <Text style={{ fontSize: 16, marginRight: 8 }}>🚨</Text>
+          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>SOS Alerts</Text>
+        </TouchableOpacity>
       </View>
 
       {loadingIncidents ? (
